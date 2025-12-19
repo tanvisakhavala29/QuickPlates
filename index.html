@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QuickPlates — Fast recipe & plate builder</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Segoe UI,system-ui,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#071023 0%,var(--bg) 60%);color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+    .container{width:100%;max-width:980px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:28px}
+    .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;color:#042029}
+    h1{margin:0;font-size:1.6rem}
+    p.lead{margin:6px 0 0;color:var(--muted)}
+    .card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);padding:24px;border-radius:12px;display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+    .features{display:grid;gap:12px}
+    .feature{display:flex;gap:12px;align-items:flex-start}
+    .icon{width:44px;height:44px;border-radius:8px;background:rgba(255,255,255,0.03);display:inline-grid;place-items:center;color:var(--accent);font-weight:700}
+    .actions{display:flex;flex-direction:column;gap:12px}
+    .btn{display:inline-block;padding:12px 14px;border-radius:10px;text-decoration:none;color:#022028;font-weight:600;background:var(--accent);text-align:center}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#e6eef8}
+    footer{margin-top:14px;color:var(--muted);font-size:0.85rem}
+    @media (max-width:880px){.card{grid-template-columns:1fr;}.actions{flex-direction:row}}
+  </style>
+</head>
+<body>
+  <main class="container" role="main">
+    <header>
+      <div class="logo">QP</div>
+      <div>
+        <h1>QuickPlates</h1>
+        <p class="lead">Build, save and share plate templates quickly — optimized for chefs, food bloggers and restaurants.</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="quickplates-heading">
+      <div>
+        <h2 id="quickplates-heading">Get started in seconds</h2>
+        <div class="features" aria-hidden="false">
+          <div class="feature">
+            <div class="icon">⚡</div>
+            <div>
+              <strong>Fast creation</strong>
+              <div style="color:var(--muted)">Drag, drop and compose plate layouts in a few clicks.</div>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="icon">💾</div>
+            <div>
+              <strong>Save & reuse</strong>
+              <div style="color:var(--muted)">Store templates and load them across devices.</div>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="icon">🔗</div>
+            <div>
+              <strong>Share links</strong>
+              <div style="color:var(--muted)">Export plates as shareable links or images.</div>
+            </div>
+          </div>
+        </div>
+
+        <footer>
+          QuickPlates • v1.0.0 — Built for rapid plate composition.
+        </footer>
+      </div>
+
+      <aside class="actions" aria-label="Primary actions">
+        <a href="app.html" class="btn" id="createBtn">Create Plate</a>
+        <a href="docs/index.html" class="btn secondary">Docs & API</a>
+        <div style="color:var(--muted);font-size:0.9rem;padding-top:6px">Or open an existing plate file from the app.</div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    // Minimal UX: confirm navigation when user clicks Create
+    document.getElementById('createBtn').addEventListener('click', function(e){
+      // keep default navigation; show a quick toast instead
+      const toast = document.createElement('div');
+      toast.textContent = 'Opening editor...';
+      Object.assign(toast.style, {
+        position:'fixed',left:'50%',bottom:'24px',transform:'translateX(-50%)',
+        background:'rgba(0,0,0,0.6)',padding:'10px 14px',borderRadius:'8px',color:'#e6eef8',zIndex:9999
+      });
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(),1200);
+    });
+  </script>
+</body>
+</html>

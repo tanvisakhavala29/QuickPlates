@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QuickPlates — Editor</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Segoe UI,system-ui,Roboto,Arial;background:var(--bg);color:#e6eef8;min-height:100vh;padding:18px}
+    .wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 320px;gap:18px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .logo{width:44px;height:44;border-radius:8px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;color:#022}
+    .card{background:#07202f;border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,0.03)}
+    .row{display:flex;gap:8px;align-items:center}
+    select,input,button,textarea{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px;border-radius:8px}
+    button{cursor:pointer;background:var(--accent);color:#022;padding:8px 10px;border:none}
+    .muted{color:var(--muted);font-size:0.9rem}
+    #canvas{margin-top:12px;background:linear-gradient(180deg,#0b1723 0%,#061018 100%);padding:12px;border-radius:10px;min-height:320px;display:grid;gap:6px}
+    .cell{background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;height:80px;border-radius:6px;padding:6px;overflow:hidden}
+    .cell .item{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;cursor:pointer}
+    .controls{display:flex;flex-direction:column;gap:8px}
+    .admin-toggle{display:flex;gap:8px;align-items:center}
+    .templates-list{max-height:220px;overflow:auto;margin-top:8px;display:grid;gap:6px}
+    .chip{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+    .admin-form{display:grid;gap:6px;margin-top:8px}
+    .small{font-size:0.85rem}
+    footer{margin-top:12px;color:var(--muted);font-size:0.85rem}
+    @media (max-width:980px){.wrap{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <header>
+        <div class="logo">QP</div>
+        <div>
+          <h2 style="margin:0">Plate Editor</h2>
+          <div class="muted">Choose a template and populate the plate.</div>
+        </div>
+      </header>
+
+      <div class="row" style="gap:10px;align-items:center">
+        <label class="small">Template</label>
+        <select id="templateSelect"></select>
+        <button id="newPlateBtn">New from Template</button>
+        <button id="savePlateBtn">Save Plate</button>
+        <button id="exportBtn">Export JSON</button>
+      </div>
+
+      <div id="canvas" role="grid" aria-label="Plate canvas">
+        <!-- grid cells inserted here -->
+      </div>
+
+      <footer>
+        <div class="muted">Saved plates and templates stored locally.</div>
+      </footer>
+    </section>
+
+    <aside class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Admin / Templates</strong>
+        <div class="admin-toggle">
+          <label class="small muted">Admin</label>
+          <input type="checkbox" id="adminToggle" />
+        </div>
+      </div>
+
+      <div class="templates-list" id="templatesList" aria-live="polite"></div>
+
+      <div class="admin-form" id="adminForm" hidden>
+        <input id="tplName" placeholder="Template name" />
+        <div style="display:flex;gap:6px">
+          <input id="tplCols" type="number" min="1" step="1" value="3" style="width:80px" />
+          <input id="tplRows" type="number" min="1" step="1" value="3" style="width:80px" />
+        </div>
+        <input id="tplBg" placeholder="Background color (CSS)" value="#0b1723" />
+        <div style="display:flex;gap:6px">
+          <button id="addTplBtn">Add / Update Template</button>
+          <button id="removeTplBtn" style="background:transparent;border:1px solid rgba(255,255,255,0.06)">Remove</button>
+        </div>
+        <div class="muted small">Click a template chip to load it. Admin mode required to add/remove templates.</div>
+      </div>
+
+      <div style="margin-top:10px">
+        <strong>Plates</strong>
+        <div id="platesList" style="display:grid;gap:6px;margin-top:6px"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // Simple local templates + plates manager
+    const TPL_KEY = 'qp_templates_v1';
+    const PLT_KEY = 'qp_plates_v1';
+
+    const defaultTemplates = [
+      {id:'tpl-3x3', name:'3 x 3 Grid', cols:3, rows:3, bg:'#0b1723'},
+      {id:'tpl-4x2', name:'4 x 2 Line', cols:4, rows:2, bg:'#071022'}
+    ];
+
+    // utilities
+    const el = id => document.getElementById(id);
+    const uid = () => 'id-'+Math.random().toString(36).slice(2,9);
+
+    function loadTemplates(){
+      const raw = localStorage.getItem(TPL_KEY);
+      if(!raw) { localStorage.setItem(TPL_KEY, JSON.stringify(defaultTemplates)); return defaultTemplates; }
+      try { return JSON.parse(raw); } catch { return defaultTemplates; }
+    }
+    function saveTemplates(list){ localStorage.setItem(TPL_KEY, JSON.stringify(list)); renderTemplates(); }
+
+    function loadPlates(){ try { return JSON.parse(localStorage.getItem(PLT_KEY) || '[]'); } catch { return []; } }
+    function savePlates(list){ localStorage.setItem(PLT_KEY, JSON.stringify(list)); renderPlates(); }
+
+    // state
+    let templates = loadTemplates();
+    let plates = loadPlates();
+    let currentTemplate = null;
+    let currentGrid = []; // array of {r,c,item}
+
+    // UI
+    const templateSelect = el('templateSelect');
+    const templatesList = el('templatesList');
+    const platesList = el('platesList');
+    const canvas = el('canvas');
+
+    function renderTemplates(){
+      templates = loadTemplates();
+      templateSelect.innerHTML = templates.map(t=>`<option value="${t.id}">${t.name} (${t.cols}x${t.rows})</option>`).join('');
+      templatesList.innerHTML = templates.map(t=>`<div class="chip" data-id="${t.id}">${t.name} • ${t.cols}x${t.rows}</div>`).join('');
+      Array.from(templatesList.children).forEach(chip=>{
+        chip.addEventListener('click', ()=> {
+          const id = chip.dataset.id;
+          templateSelect.value = id;
+        });
+      });
+    }
+
+    function renderPlates(){
+      plates = loadPlates();
+      platesList.innerHTML = plates.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="muted small">${p.name || p.id} <span style="color:var(--muted)">(${p.templateName||'--'})</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="small" data-load="${p.id}" style="background:var(--accent);color:#022">Load</button>
+          <button class="small" data-delete="${p.id}" style="background:transparent;border:1px solid rgba(255,255,255,0.06)">Del</button>
+        </div>
+      </div>`).join('');
+      // attach events
+      Array.from(platesList.querySelectorAll('[data-load]')).forEach(btn=>{
+        btn.addEventListener('click', ()=> loadPlate(btn.dataset.load));
+      });
+      Array.from(platesList.querySelectorAll('[data-delete]')).forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          plates = plates.filter(p=>p.id!==btn.dataset.delete);
+          savePlates(plates);
+        });
+      });
+    }
+
+    function buildGrid(template){
+      currentTemplate = template;
+      canvas.style.gridTemplateColumns = `repeat(${template.cols}, 1fr)`;
+      canvas.innerHTML = '';
+      currentGrid = [];
+      for(let r=0;r<template.rows;r++){
+        for(let c=0;c<template.cols;c++){
+          const idx = r*template.cols + c;
+          const cell = document.createElement('div');
+          cell.className='cell';
+          cell.dataset.r=r; cell.dataset.c=c;
+          cell.addEventListener('click', onCellClick);
+          canvas.appendChild(cell);
+          currentGrid.push({r,c,item:null,cell});
+        }
+      }
+    }
+
+    function onCellClick(e){
+      const cell = e.currentTarget;
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      const existing = currentGrid.find(g=>g.r===r && g.c===c);
+      const val = prompt('Enter item text (leave empty to remove):', existing.item ? existing.item.label : '');
+      if(val === null) return;
+      if(val.trim()===''){ existing.item = null; cell.innerHTML=''; return; }
+      const item = {id: uid(), label: val.trim()};
+      existing.item = item;
+      cell.innerHTML = `<div class="item" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</div>`;
+    }
+
+    function escapeHtml(s){ return (s+'').replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // actions
+    el('newPlateBtn').addEventListener('click', ()=>{
+      const tpl = templates.find(t=>t.id === templateSelect.value);
+      if(!tpl) return alert('Select a template');
+      buildGrid(tpl);
+    });
+
+    el('savePlateBtn').addEventListener('click', ()=>{
+      if(!currentTemplate) return alert('No plate open');
+      const payload = {
+        id: uid(),
+        name: prompt('Plate name', currentTemplate.name) || currentTemplate.name,
+        templateId: currentTemplate.id,
+        templateName: currentTemplate.name,
+        created: Date.now(),
+        cells: currentGrid.map(g=>({r:g.r,c:g.c,item:g.item}))
+      };
+      plates.push(payload);
+      savePlates(plates);
+      alert('Plate saved locally');
+    });
+
+    el('exportBtn').addEventListener('click', ()=>{
+      if(!currentTemplate) return alert('No plate open');
+      const exportObj = {
+        template: currentTemplate,
+        cells: currentGrid.map(g=>({r:g.r,c:g.c,item:g.item}))
+      };
+      const data = JSON.stringify(exportObj, null, 2);
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'plate.json'; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // admin form
+    const adminToggle = el('adminToggle');
+    const adminForm = el('adminForm');
+    adminToggle.addEventListener('change', ()=> adminForm.hidden = !adminToggle.checked);
+
+    el('addTplBtn').addEventListener('click', ()=>{
+      if(!adminToggle.checked) return alert('Enable admin to modify templates');
+      const name = el('tplName').value.trim() || prompt('Template name') || 'Untitled';
+      const cols = Math.max(1, parseInt(el('tplCols').value) || 1);
+      const rows = Math.max(1, parseInt(el('tplRows').value) || 1);
+      const bg = el('tplBg').value || '#0b1723';
+      const id = 'tpl-'+name.toLowerCase().replace(/\s+/g,'-');
+      const existing = templates.find(t=>t.id===id);
+      if(existing){
+        existing.name = name; existing.cols = cols; existing.rows = rows; existing.bg = bg;
+      } else {
+        templates.push({id, name, cols, rows, bg});
+      }
+      saveTemplates(templates);
+      el('tplName').value=''; el('tplRows').value='3'; el('tplCols').value='3';
+    });
+
+    el('removeTplBtn').addEventListener('click', ()=>{
+      if(!adminToggle.checked) return alert('Enable admin to modify templates');
+      const id = templateSelect.value;
+      if(!id) return;
+      if(!confirm('Remove template?')) return;
+      templates = templates.filter(t=>t.id!==id);
+      saveTemplates(templates);
+      // if current template removed, clear canvas
+      if(currentTemplate && currentTemplate.id===id){ canvas.innerHTML=''; currentTemplate=null; currentGrid=[]; }
+    });
+
+    // load plate
+    function loadPlate(id){
+      const p = plates.find(x=>x.id===id);
+      if(!p) return;
+      const tpl = templates.find(t=>t.id===p.templateId) || {cols:3,rows:3,name:'Custom'};
+      buildGrid(tpl);
+      // apply items
+      p.cells.forEach(c=>{
+        const match = currentGrid.find(g=>g.r===c.r && g.c===c.c);
+        if(match){
+          match.item = c.item;
+          match.cell.innerHTML = c.item ? `<div class="item">${escapeHtml(c.item.label)}</div>` : '';
+        }
+      });
+    }
+
+    // initial render
+    renderTemplates();
+    renderPlates();
+    // auto-select first template
+    if(templateSelect.options.length) templateSelect.selectedIndex = 0;
+
+    // clicking template chips loads into select and builds preview
+    templatesList.addEventListener('click', e=>{
+      const chip = e.target.closest('.chip');
+      if(!chip) return;
+      const t = templates.find(x=>x.id===chip.dataset.id);
+      if(!t) return;
+      templateSelect.value = t.id;
+      buildGrid(t);
+    });
+  </script>
+</body>
+</html>
